@@ -18,6 +18,7 @@ typedef struct cacheRecord{
 
 // the cache was stated in the project description to only hold a maximum of five items
 cacheRecord cache[5];
+pthread_mutex_t lock;
 
 void * handleFunc(void * response_sock);
 struct cacheRecord createNewRecord(char* filename, char *data, int datalen);
@@ -100,6 +101,7 @@ void * handleFunc(void * response_sock){
 
     char buffer[BUFFER_SIZE];
     char request[200] = "";
+    char path[50] = "./webroot";
     char filename[50] = "";
     int searchChar = '/';
     char * filenameStart;
@@ -115,6 +117,7 @@ void * handleFunc(void * response_sock){
     // saves until the next space in the filename variable since nothing but the file name/path will be in there.
     // the format is GET /filename HTTP 1.1, so it will take from after the '/' up until the next space
     strcpy(filename, strtok(filenameStart, " "));
+    strcat(path,filename);
 
     printf("Filename: %s\n", filename);
     printf("request: %s\n", request);
@@ -122,9 +125,13 @@ void * handleFunc(void * response_sock){
     // these headers are required for sending HTTP 1.1 responses
     char bad_header[] = "HTTP/1.1 404 Not Found\r\n\0";
     char good_header[] = "HTTP/1.1 200 OK\r\ncontent-type: text/html; charset=UTF-8\r\ncontent-disposition: inline\r\n\r\n\0";
-    if (getFile(filename) != NULL) {
+    // if the file cannot be opened from the disc location
+    if (fopen(path, "r") != NULL) {
         send(socket, good_header, strlen(good_header), 0);
+        pthread_mutex_lock(&lock);
         send(socket, getFile(filename)->data, getFile(filename)->dataLen, 0);
+        pthread_mutex_unlock(&lock);
+
     } else {
         // send this only if the file isn't on the disk
         send(socket, bad_header, strlen(bad_header), 0);
