@@ -4,11 +4,12 @@
 #include<io.h>
 #include<stdio.h>
 #include<winsock2.h>
+#include<pthread.h>
 #include <windows.h>
 #define BUFFER_SIZE 1024
 #pragma comment(lib,"ws2_32.lib") //Winsock Library
 
-void handleFunc(SOCKET socket);
+void * handleFunc(void * response_sock);
 
 int main(int argc , char *argv[])
 {
@@ -58,8 +59,11 @@ int main(int argc , char *argv[])
     while( (new_socket = accept(s , (struct sockaddr *)&client, &c)) != INVALID_SOCKET )
     {
         puts("Connection accepted");
-        //pass the function to the relevant socket
-        handleFunc(new_socket);
+        //pass the function to the relevant socket in a thread
+        pthread_t thread;
+        SOCKET * pass_socket = (SOCKET *) malloc(sizeof(SOCKET));
+        *pass_socket = new_socket;
+        pthread_create(&thread, NULL, handleFunc, (void *)pass_socket);
     }
 
     if (new_socket == INVALID_SOCKET)
@@ -74,13 +78,21 @@ int main(int argc , char *argv[])
     return 0;
 }
 
-void handleFunc(SOCKET socket){
+void * handleFunc(void * response_sock){
+    // ensure that the socket makes it through and is dereferenced
+    Sleep(1000);
+    SOCKET socket = *(SOCKET*) response_sock;
+    free(response_sock);
+
+    printf("connection received in thread\n");
+
     char buffer[BUFFER_SIZE];
     char request[200] = "";
     char path[100] = "./webroot";
     char filename[50] = "";
     int searchChar = '/';
     char * filenameStart;
+
 
     // parse the request, receive up until the carriage return, so we get the full request GET /filename HTTP 1.1 etc
     while(strchr(request,13) == NULL) {
